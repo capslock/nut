@@ -1,7 +1,11 @@
 {
-  description = "A template that shows all standard flake outputs";
+  description = "Network UPS Tools";
 
-  outputs = {nixpkgs, ...}: {
+  outputs = {
+    self,
+    nixpkgs,
+    ...
+  }: {
     defaultPackage.x86_64-linux = let
       pkgs = import nixpkgs {
         system = "x86_64-linux";
@@ -73,5 +77,323 @@
           priority = 10;
         };
       };
+    nixosModule = let
+      nut_pkgs = self.defaultPackage.x86_64-linux;
+    in
+      {
+        config,
+        lib,
+        pkgs,
+        ...
+      }:
+        with lib; let
+          cfg = config.rotap.services.nut;
+        in let
+          upsOptions = {
+            name,
+            config,
+            ...
+          }: {
+            options = {
+              # This can be inferred from the UPS model by looking at
+              # /nix/store/nut/share/driver.list
+              driver = mkOption {
+                type = types.str;
+                description = lib.mdDoc ''
+                  Specify the program to run to talk to this UPS.  apcsmart,
+                  bestups, and sec are some examples.
+                '';
+              };
+
+              port = mkOption {
+                type = types.str;
+                description = lib.mdDoc ''
+                  The serial port to which your UPS is connected.  /dev/ttyS0 is
+                  usually the first port on Linux boxes, for example.
+                '';
+              };
+
+              shutdownOrder = mkOption {
+                default = null;
+                type = types.nullOr types.int;
+                description = lib.mdDoc ''
+                  When you have multiple UPSes on your system, you usually need to
+                  turn them off in a certain order.  upsdrvctl shuts down all the
+                  0s, then the 1s, 2s, and so on.  To exclude a UPS from the
+                  shutdown sequence, set this to -1.
+                '';
+              };
+
+              maxStartDelay = mkOption {
+                default = null;
+                type = types.uniq (types.nullOr types.int);
+                description = lib.mdDoc ''
+                  This can be set as a global variable above your first UPS
+                  definition and it can also be set in a UPS section.  This value
+                  controls how long upsdrvctl will wait for the driver to finish
+                  starting.  This keeps your system from getting stuck due to a
+                  broken driver or UPS.
+                '';
+              };
+
+              description = mkOption {
+                default = null;
+                type = types.nullOr types.str;
+                description = lib.mdDoc ''
+                  Description of the UPS.
+                '';
+              };
+
+              directives = mkOption {
+                default = [];
+                type = types.listOf types.str;
+                description = lib.mdDoc ''
+                  List of configuration directives for this UPS.
+                '';
+              };
+
+              summary = mkOption {
+                default = "";
+                type = types.lines;
+                description = lib.mdDoc ''
+                  Lines which would be added inside ups.conf for handling this UPS.
+                '';
+              };
+            };
+
+            config = {
+              directives = mkOrder 10 (
+                [
+                  "driver = ${config.driver}"
+                  "port = ${config.port}"
+                ]
+                ++ (optional (config.description != null)
+                  ''desc = "${config.description}"'')
+                ++ (optional (config.shutdownOrder != null)
+                  "sdorder = ${toString config.shutdownOrder}")
+                ++ (optional (config.maxStartDelay != null)
+                  "maxstartdelay = ${toString config.maxStartDelay}")
+              );
+
+              summary =
+                concatStringsSep "\n      "
+                (["[${name}]"] ++ config.directives);
+            };
+          };
+        in {
+          options.rotap.services.nut = {
+            enable = mkOption {
+              default = false;
+              type = with types; bool;
+              description = lib.mdDoc ''
+                Enables support for Power Devices, such as Uninterruptible Power
+                Supplies, Power Distribution Units and Solar Controllers.
+              '';
+            };
+
+            schedulerRules = mkOption {
+              example = "/etc/nixos/upssched.conf";
+              type = types.str;
+              description = lib.mdDoc ''
+                File which contains the rules to handle UPS events.
+              '';
+            };
+
+            maxStartDelay = mkOption {
+              default = null;
+              type = types.nullOr types.int;
+              description = lib.mdDoc ''
+                This can be set as a global variable above your first UPS
+                definition and it can also be set in a UPS section.  This value
+                controls how long upsdrvctl will wait for the driver to finish
+                starting.  This keeps your system from getting stuck due to a
+                broken driver or UPS.
+              '';
+            };
+
+            ups = mkOption {
+              default = {};
+              # see nut/etc/ups.conf.sample
+              description = lib.mdDoc ''
+                This is where you configure all the UPSes that this system will be
+                monitoring directly.  These are usually attached to serial ports,
+                but USB devices are also supported.
+              '';
+              type = with types; attrsOf (submodule upsOptions);
+            };
+          };
+
+          config = mkIf cfg.enable {
+            environment.systemPackages = [nut_pkg];
+
+            services.udev.packages = [nut_pkg];
+
+            systemd.targets.nut = {
+              description = "Network UPS Tools - target for power device drivers, data server and monitoring client (if enabled) on this system";
+              after = ["local-fs.target" "nut-driver.target" "nut-server.target" "nut-monitor.target"];
+              wants = ["local-fs.target" "nut-driver.target" "nut-server.target" "nut-monitor.target"];
+              wantedBy = ["multi-user.target"];
+            };
+
+            systemd.targets.nut-driver = {
+              description = "Network UPS Tools - target for power device drivers on this system";
+              after = ["local-fs.target"];
+              partOf = ["nut.target"];
+              wantedBy = ["nut.target"];
+            };
+
+            systemd.services.nut-driver-enumerator = {
+              description = "Network UPS Tools - enumeration of configure-file devices into systemd unit instances";
+              after = ["local-fs.target"];
+              before = ["nut-driver.target"];
+              partOf = ["nut.target"];
+              serviceConfig = {
+                User = "root";
+                SyslogIdentifier = "%N";
+                Type = "oneshot";
+                Environment = "REPORT_RESTART_42=no";
+                EnvironmentFile = "-/etc/nut/nut.conf";
+                ExecStart = "${nut_pkgs}/libexec/nut-driver-enumerator.sh";
+                ExecReload = "${nut_pkgs}/libexec/nut-driver-enumerator.sh";
+                # Runtime directory and mode
+                RuntimeDirectory = "nut";
+                RuntimeDirectoryMode = "0750";
+                # State directory and mode
+                StateDirectory = "nut";
+                StateDirectoryMode = "0750";
+                # Configuration directory and mode
+                ConfigurationDirectory = "nut";
+                ConfigurationDirectoryMode = "0755";
+              };
+              wantedBy = ["nut.target"];
+              environment.NUT_CONFPATH = "/etc/nut/";
+              environment.NUT_STATEPATH = "/run/nut/";
+            };
+
+            systemd.services."nut-driver@" = {
+              description = ''Network UPS Tools - device driver for %I'';
+              after = ["local-fs.target"];
+              partOf = ["nut-driver.target"];
+              serviceConfig = {
+                EnvironmentFile = "-/etc/nut/nut.conf";
+                SyslogIdentifier = "%N";
+                ExecStart = ''
+                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkgs}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkgs}/sbin/upsdrvctl start "$NUTDEV"'
+                '';
+                ExecStop = ''
+                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkgs}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkgs}/sbin/upsdrvctl stop "$NUTDEV"'
+                '';
+                StartLimitInterval = "0";
+                Restart = "always";
+                RestartSec = "15s";
+                Type = "forking";
+                # Runtime directory and mode
+                RuntimeDirectory = "nut";
+                RuntimeDirectoryMode = "0750";
+                # State directory and mode
+                StateDirectory = "nut";
+                StateDirectoryMode = "0750";
+                # Configuration directory and mode
+                ConfigurationDirectory = "nut";
+                ConfigurationDirectoryMode = "0755";
+              };
+              wantedBy = ["nut-driver.target"];
+              environment.NUT_CONFPATH = "/etc/nut/";
+              environment.NUT_STATEPATH = "/run/nut/";
+            };
+
+            systemd.services.nut-monitor = {
+              description = "Network UPS Tools - power device monitor and shutdown controller";
+              after = ["local-fs.target" "network.target" "nut-server.target"];
+              wants = ["nut-server.service"];
+              partOf = ["nut.target"];
+              serviceConfig = {
+                EnvironmentFile = "-/etc/nut/nut.conf";
+                SyslogIdentifier = "%N";
+                ExecStart = "${nut_pkg}/sbin/upsmon -F";
+                ExecReload = "${nut_pkg}/sbin/upsmon -c reload";
+                PIDFile = "/run/nut/upsmon.pid";
+                # Runtime directory and mode
+                RuntimeDirectory = "nut";
+                RuntimeDirectoryMode = "0750";
+                # State directory and mode
+                StateDirectory = "nut";
+                StateDirectoryMode = "0750";
+                # Configuration directory and mode
+                ConfigurationDirectory = "nut";
+                ConfigurationDirectoryMode = "0755";
+              };
+              wantedBy = ["nut.target"];
+              environment.NUT_CONFPATH = "/etc/nut/";
+              environment.NUT_STATEPATH = "/run/nut/";
+            };
+
+            systemd.services.nut-server = {
+              description = "Network UPS Tools - power devices information server";
+              after = ["local-fs.target" "network.target" "nut-driver.target"];
+              wants = ["nut-driver.target"];
+              requires = ["network.target"];
+              before = ["nut-monitor.target"];
+              partOf = ["nut.target"];
+              serviceConfig = {
+                EnvironmentFile = "-/etc/nut/nut.conf";
+                SyslogIdentifier = "%N";
+                ExecStart = "${nut_pkg}/sbin/upsd -F";
+                ExecReload = "${nut_pkg}/sbin/upsd -c reload -P $MAINPID";
+                PIDFile = "/run/nut/upsd.pid";
+                # Runtime directory and mode
+                RuntimeDirectory = "nut";
+                RuntimeDirectoryMode = "0750";
+                # State directory and mode
+                StateDirectory = "nut";
+                StateDirectoryMode = "0750";
+                # Configuration directory and mode
+                ConfigurationDirectory = "nut";
+                ConfigurationDirectoryMode = "0755";
+              };
+              wantedBy = ["nut.target"];
+              environment.NUT_CONFPATH = "/etc/nut/";
+              environment.NUT_STATEPATH = "/run/nut/";
+            };
+
+            environment.etc = {
+              "nut/nut.conf".source =
+                pkgs.writeText "nut.conf"
+                ''
+                  MODE = standalone
+                '';
+              "nut/ups.conf".source = pkgs.writeText "ups.conf" ((
+                  if cfg.maxStartDelay != null
+                  then "maxstartdelay = ${toString cfg.maxStartDelay}"
+                  else ""
+                )
+                + ''
+
+                  ${flip concatStringsSep (forEach (attrValues cfg.ups) (ups: ups.summary)) "
+
+                  "}
+                '');
+              "nut/upssched.conf".source = cfg.schedulerRules;
+              # These file are containing private information and thus should not
+              # be stored inside the Nix store.
+              /*
+              "nut/upsd.conf".source = "";
+              "nut/upsd.users".source = "";
+              "nut/upsmon.conf".source = "";
+              */
+            };
+
+            #users.users.nut = {
+            #  # TODO: Specify this UID somewhere.
+            #  uid = 991;
+            #  isSystemUser = true;
+            #  group = "nut";
+            #  description = "UPnP A/V Media Server user";
+            #};
+
+            ## TODO: Specify this GID somewhere.
+            #users.groups."nut" = {gid = 991;};
+          };
+        };
   };
 }

@@ -317,15 +317,6 @@
                       ExecStart = "${nut_pkg}/sbin/upsmon -F";
                       ExecReload = "${nut_pkg}/sbin/upsmon -c reload";
                       PIDFile = "/run/nut/upsmon.pid";
-                      # Runtime directory and mode
-                      RuntimeDirectory = "nut";
-                      RuntimeDirectoryMode = "0750";
-                      # State directory and mode
-                      StateDirectory = "nut";
-                      StateDirectoryMode = "0750";
-                      # Configuration directory and mode
-                      ConfigurationDirectory = "nut";
-                      ConfigurationDirectoryMode = "0750";
                     };
                     wantedBy = ["nut.target"];
                     environment.NUT_CONFPATH = "/etc/nut/";
@@ -348,6 +339,7 @@
                       # Runtime directory and mode
                       RuntimeDirectory = "nut";
                       RuntimeDirectoryMode = "0750";
+                      RuntimeDirectoryPreserve = "yes";
                       # State directory and mode
                       StateDirectory = "nut";
                       StateDirectoryMode = "0750";

@@ -199,6 +199,30 @@
               '';
             };
 
+            upsdConfFile = mkOption {
+              example = "/etc/nixos/upssched.conf";
+              type = types.str;
+              description = lib.mdDoc ''
+                File which contains upsd configuration.
+              '';
+            };
+
+            upsdUsersFile = mkOption {
+              example = "/etc/nixos/upsd.users";
+              type = types.str;
+              description = lib.mdDoc ''
+                File which contains upsd user configuration.
+              '';
+            };
+
+            upsmonConfFile = mkOption {
+              example = "/etc/nixos/upsmon.conf";
+              type = types.str;
+              description = lib.mdDoc ''
+                File which contains upsmon configuration.
+              '';
+            };
+
             maxStartDelay = mkOption {
               default = null;
               type = types.nullOr types.int;
@@ -374,13 +398,11 @@
                   "}
                 '');
               "nut/upssched.conf".source = cfg.schedulerRules;
-              # These file are containing private information and thus should not
+              # These file may contain private information and thus should not
               # be stored inside the Nix store.
-              /*
-              "nut/upsd.conf".source = "";
-              "nut/upsd.users".source = "";
-              "nut/upsmon.conf".source = "";
-              */
+              "nut/upsd.conf".source = cfg.upsdConfFile;
+              "nut/upsd.users".source = cfg.upsdUsersFile;
+              "nut/upsmon.conf".source = cfg.upsmonConfFile;
             };
 
             #users.users.nut = {

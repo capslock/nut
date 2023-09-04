@@ -38,6 +38,8 @@
         nativeBuildInputs = with pkgs; [autoreconfHook libtool pkg-config makeWrapper];
 
         configureFlags = [
+          "--with-user=ups"
+          "--with-group=nut"
           "--with-all"
           "--with-ssl"
           "--without-powerman" # Until we have it ...
@@ -336,6 +338,8 @@
                       ExecStart = "${nut_pkg}/sbin/upsd -F";
                       ExecReload = "${nut_pkg}/sbin/upsd -c reload -P $MAINPID";
                       PIDFile = "/run/nut/upsd.pid";
+                      User = "ups";
+                      Group = "nut";
                       # Runtime directory and mode
                       RuntimeDirectory = "nut";
                       RuntimeDirectoryMode = "0750";
@@ -379,16 +383,16 @@
                 "nut/upsmon.conf".source = cfg.upsmonConfFile;
               };
 
-              #users.users.nut = {
-              #  # TODO: Specify this UID somewhere.
-              #  uid = 991;
-              #  isSystemUser = true;
-              #  group = "nut";
-              #  description = "UPnP A/V Media Server user";
-              #};
+              users.users.ups = {
+                # TODO: Specify this UID somewhere.
+                uid = 991;
+                isSystemUser = true;
+                group = "nut";
+                description = "UPnP A/V Media Server user";
+              };
 
-              ## TODO: Specify this GID somewhere.
-              #users.groups."nut" = {gid = 991;};
+              # TODO: Specify this GID somewhere.
+              users.groups."nut" = {gid = 991;};
             };
         };
   };

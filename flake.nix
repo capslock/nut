@@ -29,7 +29,7 @@
           })
         ];
 
-        buildInputs = with pkgs; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd];
+        buildInputs = with pkgs; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd systemd];
 
         nativeBuildInputs = with pkgs; [autoreconfHook libtool pkg-config makeWrapper];
 
@@ -40,7 +40,7 @@
           "--with-systemdsystemunitdir=$(out)/lib/systemd/system"
           "--with-systemdshutdowndir=$(out)/lib/systemd/system-shutdown"
           "--with-systemdtmpfilesdir=$(out)/lib/tmpfiles.d"
-          "--with-udev-dir=$(out)/etc/udev"
+          "--with-udev-dir=$(out)/lib/udev"
         ];
 
         enableParallelBuilding = true;

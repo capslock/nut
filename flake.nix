@@ -194,9 +194,9 @@
             schedulerRules = mkOption {
               example = "/etc/nixos/upssched.conf";
               type = types.str;
-              default = pkgs.writeText "upssched.conf" ''
+              default = toString (pkgs.writeText "upssched.conf" ''
                 CMDSCRIPT ${nut_pkg}/bin/upssched-cmd
-              '';
+              '');
               description = lib.mdDoc ''
                 File which contains the rules to handle UPS events.
               '';

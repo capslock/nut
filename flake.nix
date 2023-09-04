@@ -250,175 +250,154 @@
             };
           };
 
-          config = mkIf cfg.enable {
-            environment.systemPackages = [nut_pkg];
+          config = let
+            drivers = listToAttrs (mapAttrsToList (name: cfg:
+              nameValuePair "nut-driver@${name}" {
+                description = ''Network UPS Tools - device driver for %I'';
+                after = ["local-fs.target"];
+                partOf = ["nut-driver.target"];
+                serviceConfig = {
+                  EnvironmentFile = "-/etc/nut/nut.conf";
+                  SyslogIdentifier = "%N";
+                  ExecStart = ''
+                    ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl start "$NUTDEV"'
+                  '';
+                  ExecStop = ''
+                    ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl stop "$NUTDEV"'
+                  '';
+                  StartLimitInterval = "0";
+                  Restart = "always";
+                  RestartSec = "15s";
+                  Type = "forking";
+                  # Runtime directory and mode
+                  RuntimeDirectory = "nut";
+                  RuntimeDirectoryMode = "0750";
+                  # State directory and mode
+                  StateDirectory = "nut";
+                  StateDirectoryMode = "0750";
+                  # Configuration directory and mode
+                  ConfigurationDirectory = "nut";
+                  ConfigurationDirectoryMode = "0750";
+                };
+                wantedBy = ["nut-driver.target"];
+                environment.NUT_CONFPATH = "/etc/nut/";
+                environment.NUT_STATEPATH = "/run/nut/";
+              })
+            cfg.ups);
+          in
+            mkIf cfg.enable {
+              environment.systemPackages = [nut_pkg];
 
-            services.udev.packages = [nut_pkg];
+              services.udev.packages = [nut_pkg];
 
-            systemd.targets.nut = {
-              description = "Network UPS Tools - target for power device drivers, data server and monitoring client (if enabled) on this system";
-              after = ["local-fs.target" "nut-driver.target" "nut-server.target" "nut-monitor.target"];
-              wants = ["local-fs.target" "nut-driver.target" "nut-server.target" "nut-monitor.target"];
-              wantedBy = ["multi-user.target"];
-            };
-
-            systemd.targets.nut-driver = {
-              description = "Network UPS Tools - target for power device drivers on this system";
-              after = ["local-fs.target"];
-              partOf = ["nut.target"];
-              wantedBy = ["nut.target"];
-            };
-
-            systemd.services.nut-driver-enumerator = {
-              description = "Network UPS Tools - enumeration of configure-file devices into systemd unit instances";
-              after = ["local-fs.target"];
-              before = ["nut-driver.target"];
-              partOf = ["nut.target"];
-              serviceConfig = {
-                User = "root";
-                SyslogIdentifier = "%N";
-                Type = "oneshot";
-                Environment = "REPORT_RESTART_42=no";
-                EnvironmentFile = "-/etc/nut/nut.conf";
-                ExecStart = "${nut_pkg}/libexec/nut-driver-enumerator.sh";
-                ExecReload = "${nut_pkg}/libexec/nut-driver-enumerator.sh";
-                # Runtime directory and mode
-                RuntimeDirectory = "nut";
-                RuntimeDirectoryMode = "0750";
-                # State directory and mode
-                StateDirectory = "nut";
-                StateDirectoryMode = "0750";
-                # Configuration directory and mode
-                ConfigurationDirectory = "nut";
-                ConfigurationDirectoryMode = "0755";
+              systemd.targets.nut = {
+                description = "Network UPS Tools - target for power device drivers, data server and monitoring client (if enabled) on this system";
+                after = ["local-fs.target" "nut-driver.target" "nut-server.target" "nut-monitor.target"];
+                wants = ["local-fs.target" "nut-driver.target" "nut-server.target" "nut-monitor.target"];
+                wantedBy = ["multi-user.target"];
               };
-              wantedBy = ["nut.target"];
-              environment.NUT_CONFPATH = "/etc/nut/";
-              environment.NUT_STATEPATH = "/run/nut/";
-            };
 
-            systemd.services."nut-driver@" = {
-              description = ''Network UPS Tools - device driver for %I'';
-              after = ["local-fs.target"];
-              partOf = ["nut-driver.target"];
-              serviceConfig = {
-                EnvironmentFile = "-/etc/nut/nut.conf";
-                SyslogIdentifier = "%N";
-                ExecStart = ''
-                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl start "$NUTDEV"'
-                '';
-                ExecStop = ''
-                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl stop "$NUTDEV"'
-                '';
-                StartLimitInterval = "0";
-                Restart = "always";
-                RestartSec = "15s";
-                Type = "forking";
-                # Runtime directory and mode
-                RuntimeDirectory = "nut";
-                RuntimeDirectoryMode = "0750";
-                # State directory and mode
-                StateDirectory = "nut";
-                StateDirectoryMode = "0750";
-                # Configuration directory and mode
-                ConfigurationDirectory = "nut";
-                ConfigurationDirectoryMode = "0755";
+              systemd.targets.nut-driver = {
+                description = "Network UPS Tools - target for power device drivers on this system";
+                after = ["local-fs.target"];
+                partOf = ["nut.target"];
+                wantedBy = ["nut.target"];
               };
-              wantedBy = ["nut-driver.target"];
-              environment.NUT_CONFPATH = "/etc/nut/";
-              environment.NUT_STATEPATH = "/run/nut/";
-            };
 
-            systemd.services.nut-monitor = {
-              description = "Network UPS Tools - power device monitor and shutdown controller";
-              after = ["local-fs.target" "network.target" "nut-server.target"];
-              wants = ["nut-server.service"];
-              partOf = ["nut.target"];
-              serviceConfig = {
-                EnvironmentFile = "-/etc/nut/nut.conf";
-                SyslogIdentifier = "%N";
-                ExecStart = "${nut_pkg}/sbin/upsmon -F";
-                ExecReload = "${nut_pkg}/sbin/upsmon -c reload";
-                PIDFile = "/run/nut/upsmon.pid";
-                # Runtime directory and mode
-                RuntimeDirectory = "nut";
-                RuntimeDirectoryMode = "0750";
-                # State directory and mode
-                StateDirectory = "nut";
-                StateDirectoryMode = "0750";
-                # Configuration directory and mode
-                ConfigurationDirectory = "nut";
-                ConfigurationDirectoryMode = "0755";
-              };
-              wantedBy = ["nut.target"];
-              environment.NUT_CONFPATH = "/etc/nut/";
-              environment.NUT_STATEPATH = "/run/nut/";
-            };
+              systemd.services =
+                {
+                  nut-monitor = {
+                    description = "Network UPS Tools - power device monitor and shutdown controller";
+                    after = ["local-fs.target" "network.target" "nut-server.target"];
+                    wants = ["nut-server.service"];
+                    partOf = ["nut.target"];
+                    serviceConfig = {
+                      EnvironmentFile = "-/etc/nut/nut.conf";
+                      SyslogIdentifier = "%N";
+                      ExecStart = "${nut_pkg}/sbin/upsmon -F";
+                      ExecReload = "${nut_pkg}/sbin/upsmon -c reload";
+                      PIDFile = "/run/nut/upsmon.pid";
+                      # Runtime directory and mode
+                      RuntimeDirectory = "nut";
+                      RuntimeDirectoryMode = "0750";
+                      # State directory and mode
+                      StateDirectory = "nut";
+                      StateDirectoryMode = "0750";
+                      # Configuration directory and mode
+                      ConfigurationDirectory = "nut";
+                      ConfigurationDirectoryMode = "0750";
+                    };
+                    wantedBy = ["nut.target"];
+                    environment.NUT_CONFPATH = "/etc/nut/";
+                    environment.NUT_STATEPATH = "/run/nut/";
+                  };
 
-            systemd.services.nut-server = {
-              description = "Network UPS Tools - power devices information server";
-              after = ["local-fs.target" "network.target" "nut-driver.target"];
-              wants = ["nut-driver.target"];
-              requires = ["network.target"];
-              before = ["nut-monitor.target"];
-              partOf = ["nut.target"];
-              serviceConfig = {
-                EnvironmentFile = "-/etc/nut/nut.conf";
-                SyslogIdentifier = "%N";
-                ExecStart = "${nut_pkg}/sbin/upsd -F";
-                ExecReload = "${nut_pkg}/sbin/upsd -c reload -P $MAINPID";
-                PIDFile = "/run/nut/upsd.pid";
-                # Runtime directory and mode
-                RuntimeDirectory = "nut";
-                RuntimeDirectoryMode = "0750";
-                # State directory and mode
-                StateDirectory = "nut";
-                StateDirectoryMode = "0750";
-                # Configuration directory and mode
-                ConfigurationDirectory = "nut";
-                ConfigurationDirectoryMode = "0755";
-              };
-              wantedBy = ["nut.target"];
-              environment.NUT_CONFPATH = "/etc/nut/";
-              environment.NUT_STATEPATH = "/run/nut/";
-            };
+                  nut-server = {
+                    description = "Network UPS Tools - power devices information server";
+                    after = ["local-fs.target" "network.target" "nut-driver.target"];
+                    wants = ["nut-driver.target"];
+                    requires = ["network.target"];
+                    before = ["nut-monitor.target"];
+                    partOf = ["nut.target"];
+                    serviceConfig = {
+                      EnvironmentFile = "-/etc/nut/nut.conf";
+                      SyslogIdentifier = "%N";
+                      ExecStart = "${nut_pkg}/sbin/upsd -F";
+                      ExecReload = "${nut_pkg}/sbin/upsd -c reload -P $MAINPID";
+                      PIDFile = "/run/nut/upsd.pid";
+                      # Runtime directory and mode
+                      RuntimeDirectory = "nut";
+                      RuntimeDirectoryMode = "0750";
+                      # State directory and mode
+                      StateDirectory = "nut";
+                      StateDirectoryMode = "0750";
+                      # Configuration directory and mode
+                      ConfigurationDirectory = "nut";
+                      ConfigurationDirectoryMode = "0750";
+                    };
+                    wantedBy = ["nut.target"];
+                    environment.NUT_CONFPATH = "/etc/nut/";
+                    environment.NUT_STATEPATH = "/run/nut/";
+                  };
+                }
+                // drivers;
 
-            environment.etc = {
-              "nut/nut.conf".source =
-                pkgs.writeText "nut.conf"
-                ''
-                  MODE = standalone
-                '';
-              "nut/ups.conf".source = pkgs.writeText "ups.conf" ((
-                  if cfg.maxStartDelay != null
-                  then "maxstartdelay = ${toString cfg.maxStartDelay}"
-                  else ""
-                )
-                + ''
+              environment.etc = {
+                "nut/nut.conf".source =
+                  pkgs.writeText "nut.conf"
+                  ''
+                    MODE = standalone
+                  '';
+                "nut/ups.conf".source = pkgs.writeText "ups.conf" ((
+                    if cfg.maxStartDelay != null
+                    then "maxstartdelay = ${toString cfg.maxStartDelay}"
+                    else ""
+                  )
+                  + ''
 
-                  ${flip concatStringsSep (forEach (attrValues cfg.ups) (ups: ups.summary)) "
+                    ${flip concatStringsSep (forEach (attrValues cfg.ups) (ups: ups.summary)) "
 
                   "}
-                '');
-              "nut/upssched.conf".source = cfg.schedulerRules;
-              # These file may contain private information and thus should not
-              # be stored inside the Nix store.
-              "nut/upsd.conf".source = cfg.upsdConfFile;
-              "nut/upsd.users".source = cfg.upsdUsersFile;
-              "nut/upsmon.conf".source = cfg.upsmonConfFile;
+                  '');
+                "nut/upssched.conf".source = cfg.schedulerRules;
+                # These file may contain private information and thus should not
+                # be stored inside the Nix store.
+                "nut/upsd.conf".source = cfg.upsdConfFile;
+                "nut/upsd.users".source = cfg.upsdUsersFile;
+                "nut/upsmon.conf".source = cfg.upsmonConfFile;
+              };
+
+              #users.users.nut = {
+              #  # TODO: Specify this UID somewhere.
+              #  uid = 991;
+              #  isSystemUser = true;
+              #  group = "nut";
+              #  description = "UPnP A/V Media Server user";
+              #};
+
+              ## TODO: Specify this GID somewhere.
+              #users.groups."nut" = {gid = 991;};
             };
-
-            #users.users.nut = {
-            #  # TODO: Specify this UID somewhere.
-            #  uid = 991;
-            #  isSystemUser = true;
-            #  group = "nut";
-            #  description = "UPnP A/V Media Server user";
-            #};
-
-            ## TODO: Specify this GID somewhere.
-            #users.groups."nut" = {gid = 991;};
-          };
         };
   };
 }

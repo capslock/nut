@@ -275,6 +275,8 @@
                   Restart = "always";
                   RestartSec = "15s";
                   Type = "forking";
+                  User = "ups";
+                  Group = "nut";
                   # Runtime directory and mode
                   RuntimeDirectory = "nut";
                   RuntimeDirectoryMode = "0750";

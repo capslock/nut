@@ -52,6 +52,10 @@
         enableParallelBuilding = true;
 
         postInstall = with pkgs; ''
+          substituteInPlace $out/libexec/nut-driver-enumerator.sh \
+            --replace /bin/sleep "${gawk}/bin/awk" \
+            --replace /bin/systemctl "${systemd}/bin/systemctl"
+
           substituteInPlace $out/lib/systemd/system-shutdown/nutshutdown \
             --replace /bin/sleep "${coreutils}/bin/sleep" \
             --replace /bin/systemctl "${systemd}/bin/systemctl"

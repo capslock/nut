@@ -78,7 +78,7 @@
         };
       };
     nixosModule = let
-      nut_pkgs = self.defaultPackage.x86_64-linux;
+      nut_pkg = self.defaultPackage.x86_64-linux;
     in
       {
         config,
@@ -195,7 +195,7 @@
               example = "/etc/nixos/upssched.conf";
               type = types.str;
               default = pkgs.writeText "upssched.conf" ''
-                CMDSCRIPT ${nut_pkgs}/bin/upssched-cmd
+                CMDSCRIPT ${nut_pkg}/bin/upssched-cmd
               '';
               description = lib.mdDoc ''
                 File which contains the rules to handle UPS events.
@@ -280,8 +280,8 @@
                 Type = "oneshot";
                 Environment = "REPORT_RESTART_42=no";
                 EnvironmentFile = "-/etc/nut/nut.conf";
-                ExecStart = "${nut_pkgs}/libexec/nut-driver-enumerator.sh";
-                ExecReload = "${nut_pkgs}/libexec/nut-driver-enumerator.sh";
+                ExecStart = "${nut_pkg}/libexec/nut-driver-enumerator.sh";
+                ExecReload = "${nut_pkg}/libexec/nut-driver-enumerator.sh";
                 # Runtime directory and mode
                 RuntimeDirectory = "nut";
                 RuntimeDirectoryMode = "0750";
@@ -305,10 +305,10 @@
                 EnvironmentFile = "-/etc/nut/nut.conf";
                 SyslogIdentifier = "%N";
                 ExecStart = ''
-                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkgs}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkgs}/sbin/upsdrvctl start "$NUTDEV"'
+                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl start "$NUTDEV"'
                 '';
                 ExecStop = ''
-                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkgs}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkgs}/sbin/upsdrvctl stop "$NUTDEV"'
+                  ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl stop "$NUTDEV"'
                 '';
                 StartLimitInterval = "0";
                 Restart = "always";

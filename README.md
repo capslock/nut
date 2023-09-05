@@ -39,7 +39,7 @@ TODO: Explain/make this example better.
 
 ```nix
 {
-  rotap.services.nut = {
+  services.nut = {
     enable = true;
     ups."Eaton5S" = {
       driver = "usbhid-ups";

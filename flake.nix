@@ -93,7 +93,7 @@
         ...
       }:
         with lib; let
-          cfg = config.rotap.services.nut;
+          cfg = config.services.nut;
         in let
           upsOptions = {
             name,
@@ -187,7 +187,7 @@
             };
           };
         in {
-          options.rotap.services.nut = {
+          options.services.nut = {
             enable = mkOption {
               default = false;
               type = with types; bool;

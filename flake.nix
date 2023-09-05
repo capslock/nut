@@ -262,6 +262,7 @@
                 description = ''Network UPS Tools - device driver for %I'';
                 after = ["local-fs.target"];
                 partOf = ["nut-driver.target"];
+                startLimitIntervalSec = 0;
                 serviceConfig = {
                   EnvironmentFile = "-/etc/nut/nut.conf";
                   SyslogIdentifier = "%N";
@@ -271,7 +272,6 @@
                   ExecStop = ''
                     ${pkgs.bashInteractive}/bin/sh -c 'NUTDEV="`${nut_pkg}/libexec/nut-driver-enumerator.sh --get-device-for-service %i`" && [ -n "$NUTDEV" ] || { echo "FATAL: Could not find a NUT device section for service unit %i" >&2 ; exit 1 ; } ; ${nut_pkg}/sbin/upsdrvctl stop "$NUTDEV"'
                   '';
-                  StartLimitInterval = "0";
                   Restart = "always";
                   RestartSec = "15s";
                   Type = "forking";

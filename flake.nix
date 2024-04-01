@@ -4,6 +4,7 @@
   outputs = {
     self,
     nixpkgs,
+    nut ? nixpkgs.pkgs.nut,
     ...
   }: {
     defaultPackage.x86_64-linux = let
@@ -12,14 +13,11 @@
       };
       lib = pkgs.lib;
     in
-      pkgs.stdenv.mkDerivation rec {
-        pname = "nut";
-        version = "2.8.0";
+      pkgs.stdenv.mkDerivation {
+        pname = nut.pname;
+        version = nut.version;
 
-        src = pkgs.fetchurl {
-          url = "https://networkupstools.org/source/${lib.versions.majorMinor version}/${pname}-${version}.tar.gz";
-          sha256 = "sha256-w+WnCNp5e3xwtlPTexIGoAD8tQO4VRn+TN9jU/eSv+U=";
-        };
+        src = nut.src;
 
         patches = with pkgs; [
           (substituteAll {

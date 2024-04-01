@@ -51,7 +51,8 @@
 
         postInstall = with pkgs; ''
           substituteInPlace $out/libexec/nut-driver-enumerator.sh \
-            --replace /bin/sleep "${gawk}/bin/awk" \
+            --replace /bin/awk "${gawk}/bin/awk" \
+            --replace /bin/sleep "${coreutils}/bin/sleep" \
             --replace /bin/systemctl "${systemd}/bin/systemctl"
 
           substituteInPlace $out/lib/systemd/system-shutdown/nutshutdown \

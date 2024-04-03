@@ -4,13 +4,13 @@
   outputs = {
     self,
     nixpkgs,
-    nut ? nixpkgs.pkgs.nut,
     ...
   }: {
     defaultPackage.x86_64-linux = let
       pkgs = import nixpkgs {
         system = "x86_64-linux";
       };
+      nut = pkgs.nut;
     in
       pkgs.stdenv.mkDerivation {
         inherit (nut) pname version src meta;

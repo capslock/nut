@@ -11,13 +11,9 @@
       pkgs = import nixpkgs {
         system = "x86_64-linux";
       };
-      lib = pkgs.lib;
     in
       pkgs.stdenv.mkDerivation {
-        pname = nut.pname;
-        version = nut.version;
-
-        src = nut.src;
+        inherit (nut) pname version src meta;
 
         patches = with pkgs; [
           (substituteAll {
@@ -67,20 +63,6 @@
           # we don't need init.d scripts
           rm -r $out/share/solaris-init
         '';
-
-        meta = with lib; {
-          description = "Network UPS Tools";
-          longDescription = ''
-            Network UPS Tools is a collection of programs which provide a common
-            interface for monitoring and administering UPS, PDU and SCD hardware.
-            It uses a layered approach to connect all of the parts.
-          '';
-          homepage = "https://networkupstools.org/";
-          platforms = platforms.linux;
-          maintainers = [maintainers.pierron];
-          license = with licenses; [gpl1Plus gpl2Plus gpl3Plus];
-          priority = 10;
-        };
       };
     nixosModule = let
       nut_pkg = self.defaultPackage.x86_64-linux;

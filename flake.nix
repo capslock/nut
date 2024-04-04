@@ -6,30 +6,23 @@
     nixpkgs,
     ...
   }: {
-    defaultPackage.x86_64-linux = let
-      pkgs = import nixpkgs {
-        system = "x86_64-linux";
-      };
-      nut = pkgs.nut;
-    in
-      pkgs.stdenv.mkDerivation {
-        inherit (nut) pname version src meta;
-
-        patches = with pkgs; [
-          (substituteAll {
+    overlays.default = final: prev: {
+      nut = prev.nut.override {
+        patches = [
+          (final.substituteAll {
             src = ./hardcode-paths.patch;
-            avahi = "${avahi}/lib";
-            freeipmi = "${freeipmi}/lib";
-            libusb = "${libusb1}/lib";
-            neon = "${neon}/lib";
-            libmodbus = "${libmodbus}/lib";
-            netsnmp = "${net-snmp.lib}/lib";
+            avahi = "${final.avahi}/lib";
+            freeipmi = "${final.freeipmi}/lib";
+            libusb = "${final.libusb1}/lib";
+            neon = "${final.neon}/lib";
+            libmodbus = "${final.libmodbus}/lib";
+            netsnmp = "${final.net-snmp.lib}/lib";
           })
         ];
 
-        buildInputs = with pkgs; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd systemd];
+        buildInputs = with final; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd systemd];
 
-        nativeBuildInputs = with pkgs; [autoreconfHook libtool pkg-config makeWrapper];
+        nativeBuildInputs = with final; [autoreconfHook libtool pkg-config makeWrapper];
 
         configureFlags = [
           "--with-user=ups"
@@ -45,7 +38,7 @@
 
         enableParallelBuilding = true;
 
-        postInstall = with pkgs; ''
+        postInstall = with final; ''
           substituteInPlace $out/libexec/nut-driver-enumerator.sh \
             --replace /bin/awk "${gawk}/bin/awk" \
             --replace /bin/sleep "${coreutils}/bin/sleep" \
@@ -64,8 +57,14 @@
           rm -r $out/share/solaris-init
         '';
       };
-    nixosModule = let
-      nut_pkg = self.defaultPackage.x86_64-linux;
+    };
+    nixosModules.default = let
+      system = "x86_64-linux";
+      pkgs = import nixpkgs {
+        inherit system;
+        overlays = [self.overlays.default];
+      };
+      nut_pkg = pkgs.nut;
     in
       {
         config,

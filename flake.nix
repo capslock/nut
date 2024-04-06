@@ -6,58 +6,63 @@
     nixpkgs,
     ...
   }: {
-    overlays.default = final: prev: {
-      nut = prev.nut.override {
-        patches = [
-          (final.substituteAll {
-            src = ./hardcode-paths.patch;
-            avahi = "${final.avahi}/lib";
-            freeipmi = "${final.freeipmi}/lib";
-            libusb = "${final.libusb1}/lib";
-            neon = "${final.neon}/lib";
-            libmodbus = "${final.libmodbus}/lib";
-            netsnmp = "${final.net-snmp.lib}/lib";
-          })
-        ];
+    overlays.default = let
+      # TODO: Unify this with the service config?
+      user = "ups";
+      group = "nut";
+    in
+      final: prev: {
+        nut = prev.nut.override {
+          patches = [
+            (final.substituteAll {
+              src = ./hardcode-paths.patch;
+              avahi = "${final.avahi}/lib";
+              freeipmi = "${final.freeipmi}/lib";
+              libusb = "${final.libusb1}/lib";
+              neon = "${final.neon}/lib";
+              libmodbus = "${final.libmodbus}/lib";
+              netsnmp = "${final.net-snmp.lib}/lib";
+            })
+          ];
 
-        buildInputs = with final; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd systemd];
+          buildInputs = with final; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd systemd];
 
-        nativeBuildInputs = with final; [autoreconfHook libtool pkg-config makeWrapper];
+          nativeBuildInputs = with final; [autoreconfHook libtool pkg-config makeWrapper];
 
-        configureFlags = [
-          "--with-user=ups"
-          "--with-group=nut"
-          "--with-all"
-          "--with-ssl"
-          "--without-powerman" # Until we have it ...
-          "--with-systemdsystemunitdir=$(out)/lib/systemd/system"
-          "--with-systemdshutdowndir=$(out)/lib/systemd/system-shutdown"
-          "--with-systemdtmpfilesdir=$(out)/lib/tmpfiles.d"
-          "--with-udev-dir=$(out)/lib/udev"
-        ];
+          configureFlags = [
+            "--with-user=${user}"
+            "--with-group=${group}"
+            "--with-all"
+            "--with-ssl"
+            "--without-powerman" # Until we have it ...
+            "--with-systemdsystemunitdir=$(out)/lib/systemd/system"
+            "--with-systemdshutdowndir=$(out)/lib/systemd/system-shutdown"
+            "--with-systemdtmpfilesdir=$(out)/lib/tmpfiles.d"
+            "--with-udev-dir=$(out)/lib/udev"
+          ];
 
-        enableParallelBuilding = true;
+          enableParallelBuilding = true;
 
-        postInstall = with final; ''
-          substituteInPlace $out/libexec/nut-driver-enumerator.sh \
-            --replace /bin/awk "${gawk}/bin/awk" \
-            --replace /bin/sleep "${coreutils}/bin/sleep" \
-            --replace /bin/systemctl "${systemd}/bin/systemctl"
+          postInstall = with final; ''
+            substituteInPlace $out/libexec/nut-driver-enumerator.sh \
+              --replace /bin/awk "${gawk}/bin/awk" \
+              --replace /bin/sleep "${coreutils}/bin/sleep" \
+              --replace /bin/systemctl "${systemd}/bin/systemctl"
 
-          substituteInPlace $out/lib/systemd/system-shutdown/nutshutdown \
-            --replace /bin/sleep "${coreutils}/bin/sleep" \
-            --replace /bin/systemctl "${systemd}/bin/systemctl"
+            substituteInPlace $out/lib/systemd/system-shutdown/nutshutdown \
+              --replace /bin/sleep "${coreutils}/bin/sleep" \
+              --replace /bin/systemctl "${systemd}/bin/systemctl"
 
-          for file in system/{nut-monitor.service,nut-driver-enumerator.service,nut-server.service,nut-driver@.service} system-shutdown/nutshutdown; do
-          substituteInPlace $out/lib/systemd/$file \
-            --replace "$out/etc/nut.conf" "/etc/nut.conf"
-          done
+            for file in system/{nut-monitor.service,nut-driver-enumerator.service,nut-server.service,nut-driver@.service} system-shutdown/nutshutdown; do
+            substituteInPlace $out/lib/systemd/$file \
+              --replace "$out/etc/nut.conf" "/etc/nut.conf"
+            done
 
-          # we don't need init.d scripts
-          rm -r $out/share/solaris-init
-        '';
+            # we don't need init.d scripts
+            rm -r $out/share/solaris-init
+          '';
+        };
       };
-    };
     nixosModules.default = let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -74,6 +79,8 @@
       }:
         with lib; let
           cfg = config.services.nut;
+          user = "ups";
+          group = "nut";
         in let
           upsOptions = {
             name,
@@ -369,16 +376,16 @@
                 "nut/upsmon.conf".source = cfg.upsmonConfFile;
               };
 
-              users.users.ups = {
+              users.users."${user}" = {
                 # TODO: Specify this UID somewhere.
                 uid = 991;
                 isSystemUser = true;
-                group = "nut";
+                inherit group;
                 description = "UPnP A/V Media Server user";
               };
 
               # TODO: Specify this GID somewhere.
-              users.groups."nut" = {gid = 991;};
+              users.groups."${group}" = {gid = 991;};
             };
         };
   };

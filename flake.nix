@@ -80,7 +80,11 @@
         with lib; let
           cfg = config.services.nut;
           user = "ups";
+          # TODO: Specify this UID somewhere.
+          uid = 991;
           group = "nut";
+          # TODO: Specify this GID somewhere.
+          gid = 991;
         in let
           upsOptions = {
             name,
@@ -377,15 +381,14 @@
               };
 
               users.users."${user}" = {
-                # TODO: Specify this UID somewhere.
-                uid = 991;
+                inherit uid group;
                 isSystemUser = true;
-                inherit group;
                 description = "UPnP A/V Media Server user";
               };
 
-              # TODO: Specify this GID somewhere.
-              users.groups."${group}" = {gid = 991;};
+              users.groups."${group}" = {
+                inherit gid;
+              };
             };
         };
   };

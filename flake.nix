@@ -25,9 +25,7 @@
             })
           ];
 
-          buildInputs = with final; [neon libusb1 openssl udev avahi freeipmi libmodbus i2c-tools net-snmp gd systemd];
-
-          nativeBuildInputs = with final; [autoreconfHook libtool pkg-config makeWrapper];
+          buildInputs = prev.buildInputs ++ [final.systemd];
 
           configureFlags = [
             "--with-user=${user}"
@@ -40,8 +38,6 @@
             "--with-systemdtmpfilesdir=$(out)/lib/tmpfiles.d"
             "--with-udev-dir=$(out)/lib/udev"
           ];
-
-          enableParallelBuilding = true;
 
           postInstall = with final; ''
             substituteInPlace $out/libexec/nut-driver-enumerator.sh \

@@ -13,18 +13,6 @@
     in
       final: prev: {
         nut = prev.nut.override {
-          patches = [
-            (final.substituteAll {
-              src = ./hardcode-paths.patch;
-              avahi = "${final.avahi}/lib";
-              freeipmi = "${final.freeipmi}/lib";
-              libusb = "${final.libusb1}/lib";
-              neon = "${final.neon}/lib";
-              libmodbus = "${final.libmodbus}/lib";
-              netsnmp = "${final.net-snmp.lib}/lib";
-            })
-          ];
-
           buildInputs = prev.buildInputs ++ [final.systemd];
 
           configureFlags = [

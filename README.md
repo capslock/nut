@@ -23,8 +23,13 @@ To use this flake, add it to your `flake.nix` file:
   outputs = { self, nixpkgs, nut }: {
     nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
       modules = [
+        ({
+          config,
+          pkgs,
+          ...
+        }: {nixpkgs.overlays = [nut.overlays.default];})
         ./configuration.nix
-        nut.nixosModule
+        nut.nixosModules.default
       ];
     };
   };
